@@ -41,8 +41,10 @@ app.post('/insert', async (req, res) => {
 // Endpoint to get average data from the last hour
 app.get('/getLastHourData', async (req, res) => {
   try {
+    // Get the current timestamp in GMT and subtract one hour (in milliseconds)
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000); // Get timestamp for one hour ago
 
+    // Create the aggregation pipeline
     const pipeline = [
       {
         $match: {
@@ -60,8 +62,10 @@ app.get('/getLastHourData', async (req, res) => {
       }
     ];
 
+    // Execute the aggregation pipeline
     const result = await collection.aggregate(pipeline).toArray();
 
+    // Check if results are found
     if (result.length > 0) {
       res.status(200).json(result[0]); // Send the averaged result
     } else {
@@ -72,6 +76,7 @@ app.get('/getLastHourData', async (req, res) => {
     res.status(500).send('Error fetching last hour data');
   }
 });
+
 
 // Start the server
 app.listen(port, () => {

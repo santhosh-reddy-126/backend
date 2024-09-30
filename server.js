@@ -30,52 +30,78 @@ client.connect()
 app.post('/insert', async (req, res) => {
   try {
     const data = req.body; // Expecting JSON data
-    await collection.insertOne(data);
-    res.status(200).send('Data inserted successfully');
+
+    // Step 1: Retrieve or initialize the document count
+    const counterDoc = await collection.findOne({ name: 'documentCount' });
+    
+    if (!counterDoc) {
+      // If no counter document exists, create one
+      await collection.insertOne({ name: 'documentCount', count: 0 });
+    }
+
+    // Step 2: Increment the document count
+    const newCount = (counterDoc ? counterDoc.count : 0) + 1;
+
+    // Update the counter document with the new count
+    await collection.updateOne(
+      { name: 'documentCount' },
+      { $set: { count: newCount } }
+    );
+
+    // Step 3: Prepare new data with a unique number
+    const newData = {
+      ...data,
+      number: newCount // Assign a unique number to the new document
+    };
+
+    // Step 4: Insert the new document
+    await collection.insertOne(newData);
+    
+    res.status(200).send('Data inserted successfully2');
   } catch (error) {
     console.error("Error inserting data:", error);
     res.status(500).send('Error inserting data');
   }
 });
 
+
 // Endpoint to get average data from the last hour
 app.get('/getLastHourData', async (req, res) => {
   try {
-    // Get the current timestamp in GMT and subtract one hour (in milliseconds)
-    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000); // Get timestamp for one hour ago
+    // Step 1: Fetch the last 20 documents sorted by the 'number' field in descending order
+    const last20Documents = await collection
+      .find({})
+      .sort({ number: -1 }) // Sort by 'number' in descending order to get the last inserted documents
+      .limit(20) // Limit to the last 20 documents
+      .toArray();
 
-    // Create the aggregation pipeline
-    const pipeline = [
-      {
-        $match: {
-          timestamp: { $gte: oneHourAgo } // Filter for documents from the last hour
-        }
-      },
-      {
-        $group: {
-          _id: null,
-          avgTemperature: { $avg: "$temperature" },
-          avgHumidity: { $avg: "$humidity" },
-          avgSoilMoisture: { $avg: "$soilMoisture" },
-          avgLight: { $avg: "$light" }
-        }
-      }
-    ];
-
-    // Execute the aggregation pipeline
-    const result = await collection.aggregate(pipeline).toArray();
-
-    // Check if results are found
-    if (result.length > 0) {
-      res.status(200).json(result[0]); // Send the averaged result
-    } else {
-      res.status(404).send('No data found in the last hour');
+    // Step 2: Check if any documents are retrieved
+    if (last20Documents.length === 0) {
+      return res.status(404).send('No documents found');
     }
+
+    // Step 3: Calculate the averages for the specified fields
+    const total = last20Documents.length;
+    const avgTemperature = last20Documents.reduce((acc, doc) => acc + doc.temperature, 0) / total;
+    const avgHumidity = last20Documents.reduce((acc, doc) => acc + doc.humidity, 0) / total;
+    const avgSoilMoisture = last20Documents.reduce((acc, doc) => acc + doc.moisture, 0) / total; // Corrected field name
+    const avgLight = last20Documents.reduce((acc, doc) => acc + doc.light, 0) / total;
+
+    // Step 4: Respond with the calculated averages
+    res.status(200).json({
+      avgTemperature,
+      avgHumidity,
+      avgSoilMoisture,
+      avgLight
+    });
   } catch (error) {
-    console.error("Error fetching last hour data:", error);
-    res.status(500).send('Error fetching last hour data');
+    console.error("Error fetching last 20 documents average:", error);
+    res.status(500).send('Error fetching last 20 documents average');
   }
 });
+
+
+
 
 
 // Start the server

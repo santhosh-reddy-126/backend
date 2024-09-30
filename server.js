@@ -81,11 +81,36 @@ app.get('/getLastHourData', async (req, res) => {
     }
 
     // Step 3: Calculate the averages for the specified fields
-    const total = last20Documents.length;
-    const avgTemperature = last20Documents.reduce((acc, doc) => acc + doc.temperature, 0) / total;
-    const avgHumidity = last20Documents.reduce((acc, doc) => acc + doc.humidity, 0) / total;
-    const avgSoilMoisture = last20Documents.reduce((acc, doc) => acc + doc.moisture, 0) / total; // Corrected field name
-    const avgLight = last20Documents.reduce((acc, doc) => acc + doc.light, 0) / total;
+    let totalTemperature = 0;
+    let totalHumidity = 0;
+    let totalSoilMoisture = 0;
+    let totalLight = 0;
+    let count = 0;
+
+    last20Documents.forEach(doc => {
+      if (doc.temperature != null) {
+        totalTemperature += doc.temperature;
+      }
+      if (doc.humidity != null) {
+        totalHumidity += doc.humidity;
+      }
+      if (doc.moisture != null) {
+        totalSoilMoisture += doc.moisture;
+      }
+      if (doc.light != null) {
+        totalLight += doc.light;
+      }
+      // Count how many fields have valid data
+      if (doc.temperature != null || doc.humidity != null || doc.moisture != null || doc.light != null) {
+        count++;
+      }
+    });
+
+    // Avoid division by zero
+    const avgTemperature = count > 0 ? totalTemperature / count : null;
+    const avgHumidity = count > 0 ? totalHumidity / count : null;
+    const avgSoilMoisture = count > 0 ? totalSoilMoisture / count : null;
+    const avgLight = count > 0 ? totalLight / count : null;
 
     // Step 4: Respond with the calculated averages
     res.status(200).json({
@@ -99,6 +124,7 @@ app.get('/getLastHourData', async (req, res) => {
     res.status(500).send('Error fetching last 20 documents average');
   }
 });
+
 
 
 
